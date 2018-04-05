@@ -1,15 +1,17 @@
 var request = require("request");
 var http = require('http');
 var url = require('url');
-var Service, Characteristic;
+var Service, Characteristic, FakeGatoHistoryService;
 var DEFAULT_REQUEST_TIMEOUT = 10000;
 var CONTEXT_FROM_WEBHOOK = "fromHTTPWebhooks";
 var CONTEXT_FROM_TIMEOUTCALL = "fromTimeoutCall";
+const version = require('./package.json').version;
 
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
 
+  FakeGatoHistoryService = require("fakegato-history")(homebridge);
   homebridge.registerPlatform("homebridge-http-webhooks", "HttpWebHooks", HttpWebHooksPlatform);
   homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookSensor", HttpWebHookSensorAccessory);
   homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookSwitch", HttpWebHookSwitchAccessory);
@@ -154,7 +156,7 @@ HttpWebHooksPlatform.prototype = {
                 };
               }
               else {
-                if (accessory.type == "humidity" || accessory.type == "temperature") {
+                if (accessory.type == "humidity" || accessory.type == "temperature" || accessory.type == "airquality") {
                   var cachedValue = this.storage.getItemSync("http-webhook-" + accessoryId);
                   if (cachedValue === undefined) {
                     cachedValue = 0;
@@ -266,6 +268,7 @@ HttpWebHooksPlatform.prototype = {
 
 function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
   this.log = log;
+  this.fakeGatoHistoryService = undefined;
   this.id = sensorConfig["id"];
   this.name = sensorConfig["name"];
   this.type = sensorConfig["type"];
@@ -281,9 +284,11 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
   }
   else if (this.type === "motion") {
     this.service = new Service.MotionSensor(this.name);
+    this.fakeGatoHistoryService = new FakeGatoHistoryService("motion", this);
     this.changeHandler = (function(newState) {
       // this.log("Change HomeKit state for motion sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.MotionDetected).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+      this.LoggingService.addEntry({time: moment().unix(), status: newState ? 1 : 0});
     }).bind(this);
     this.service.getCharacteristic(Characteristic.MotionDetected).on('get', this.getState.bind(this));
   }
@@ -320,6 +325,14 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentTemperature).on('get', this.getState.bind(this));
   }
+  else if (this.type === "airquality") {
+    this.service = new Service.AirQualitySensor(this.name);
+    this.changeHandler = (function(newState) {
+      this.log("Change HomeKit value for air quality sensor to '%s'.", newState);
+      this.service.getCharacteristic(Characteristic.AirQuality).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+    }).bind(this);
+    this.service.getCharacteristic(Characteristic.AirQuality).on('get', this.getState.bind(this));
+  }
 }
 
 HttpWebHookSensorAccessory.prototype.getState = function(callback) {
@@ -343,7 +356,20 @@ HttpWebHookSensorAccessory.prototype.getState = function(callback) {
 };
 
 HttpWebHookSensorAccessory.prototype.getServices = function() {
-  return [ this.service ];
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Sensor")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Sensor" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
 
 function HttpWebHookSwitchAccessory(log, switchConfig, storage) {
