@@ -288,7 +288,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       // this.log("Change HomeKit state for motion sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.MotionDetected).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.LoggingService.addEntry({time: moment().unix(), status: newState ? 1 : 0});
+      this.fakeGatoHistoryService.addEntry({time: moment().unix(), status: newState ? 1 : 0});
     }).bind(this);
     this.service.getCharacteristic(Characteristic.MotionDetected).on('get', this.getState.bind(this));
   }
@@ -311,17 +311,21 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
   }
   else if (this.type === "humidity") {
     this.service = new Service.HumiditySensor(this.name);
+    this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this);
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for humidity sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+      this.fakeGatoHistoryService.addEntry({time: moment().unix(),  humidity: newState });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).on('get', this.getState.bind(this));
   }
   else if (this.type === "temperature") {
     this.service = new Service.TemperatureSensor(this.name);
+    this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this);
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for temperature sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentTemperature).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+      this.fakeGatoHistoryService.addEntry({time: moment().unix(),  temp: newState });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentTemperature).on('get', this.getState.bind(this));
   }
@@ -360,7 +364,7 @@ HttpWebHookSensorAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook Sensor")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Sensor")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Sensor" + this.id);
       
