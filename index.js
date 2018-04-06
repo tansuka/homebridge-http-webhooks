@@ -288,7 +288,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       // this.log("Change HomeKit state for motion sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.MotionDetected).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.fakeGatoHistoryService.addEntry({time: moment().unix(), status: newState ? 1 : 0});
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000, status: newState ? 1 : 0});
     }).bind(this);
     this.service.getCharacteristic(Characteristic.MotionDetected).on('get', this.getState.bind(this));
   }
@@ -315,7 +315,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for humidity sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.fakeGatoHistoryService.addEntry({time: moment().unix(),  humidity: newState });
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  humidity: newState });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).on('get', this.getState.bind(this));
   }
@@ -325,7 +325,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for temperature sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentTemperature).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.fakeGatoHistoryService.addEntry({time: moment().unix(),  temp: newState });
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  temp: newState });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentTemperature).on('get', this.getState.bind(this));
   }

@@ -25,6 +25,7 @@
     "homebridge": ">=0.3.0"
   },
   "dependencies": {
+    "fakegato-history": "^0.4.0",
     "request": "2.49.x",
     "node-persist" : "2.0.x"
   },
