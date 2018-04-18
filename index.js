@@ -434,7 +434,20 @@ HttpWebHookSwitchAccessory.prototype.setState = function(powerOn, callback, cont
 };
 
 HttpWebHookSwitchAccessory.prototype.getServices = function() {
-  return [ this.service ];
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Switch")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Switch" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
 
 function HttpWebHookPushButtonAccessory(log, pushButtonConfig, storage) {
@@ -499,7 +512,20 @@ HttpWebHookPushButtonAccessory.prototype.setState = function(powerOn, callback, 
 };
 
 HttpWebHookPushButtonAccessory.prototype.getServices = function() {
-  return [ this.service ];
+    var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Button")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Button" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
 
 function HttpWebHookLightAccessory(log, lightConfig, storage) {
@@ -560,7 +586,20 @@ HttpWebHookLightAccessory.prototype.setState = function(powerOn, callback, conte
 };
 
 HttpWebHookLightAccessory.prototype.getServices = function() {
-  return [ this.service ];
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Light")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Light" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
 
 function HttpWebHookThermostatAccessory(log, thermostatConfig, storage) {
@@ -697,7 +736,20 @@ HttpWebHookThermostatAccessory.prototype.getCurrentHeatingCoolingState = functio
 };
 
 HttpWebHookThermostatAccessory.prototype.getServices = function() {
-  return [ this.service ];
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Thermostat")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Thermostat" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
 
 function HttpWebHookOutletAccessory(log, outletConfig, storage) {
@@ -773,5 +825,18 @@ HttpWebHookOutletAccessory.prototype.setState = function(powerOn, callback, cont
 };
 
 HttpWebHookOutletAccessory.prototype.getServices = function() {
-  return [ this.service ];
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Outlet")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Outlet" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
 };
