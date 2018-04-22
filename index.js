@@ -536,6 +536,8 @@ function HttpWebHookLightAccessory(log, lightConfig, storage) {
   this.onMethod = lightConfig["on_method"] || "GET";
   this.offURL = lightConfig["off_url"] || "";
   this.offMethod = lightConfig["off_method"] || "GET";
+  this.stateURL = lightConfig["state_url"] || "";
+  this.stateMethod = lightConfig["state_method"] || "GET";
   this.storage = storage;
 
   this.service = new Service.Lightbulb(this.name);
@@ -548,11 +550,48 @@ function HttpWebHookLightAccessory(log, lightConfig, storage) {
 
 HttpWebHookLightAccessory.prototype.getState = function(callback) {
   this.log("Getting current state for '%s'...", this.id);
-  var state = this.storage.getItemSync("http-webhook-" + this.id);
-  if (state === undefined) {
-    state = false;
-  }
-  callback(null, state);
+  var state = undefined;
+  var urlToCall = this.stateURL;
+  var urlMethod = this.stateMethod;
+  var that = this;
+
+  if (urlToCall !== "" ) {
+    request({
+      method : urlMethod,
+      url : urlToCall,
+      timeout : DEFAULT_REQUEST_TIMEOUT
+    }, (function(err, response, body) {
+      var statusCode = response && response.statusCode ? response.statusCode : -1;
+      that.log("Request to '%s' finished with status code '%s' and body '%s'.", urlToCall, statusCode, body, err);
+      if (!err && statusCode == 200) {
+        var sonoff_reply = JSON.parse(body);
+        var responseState = sonoff_reply["POWER"];
+        that.log("Status is '%s' ", responseState);
+        if(responseState === "ON"){
+          that.log("State is '%s' ", state);
+          state = true;
+          callback(null, state);
+        } else if (responseState === "OFF"){
+          that.log("State is '%s' ", state);
+          state = false;
+          callback(null, state);
+        }
+      }
+      else {
+        that.log(err || new Error("Request to '" + urlToCall + "' was not succesful."));
+      }
+    }));
+  } else {
+  	state = this.storage.getItemSync("http-webhook-" + this.id);
+
+    if (state === undefined) {
+      state = false;
+    }
+    callback(null, state);
+  } 
+
+  //this.log("State is '%s' ", state);
+  //callback(null, state);
 };
 
 HttpWebHookLightAccessory.prototype.setState = function(powerOn, callback, context) {
