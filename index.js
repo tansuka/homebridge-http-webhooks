@@ -156,7 +156,7 @@ HttpWebHooksPlatform.prototype = {
                 };
               }
               else {
-                if (accessory.type == "humidity" || accessory.type == "temperature" || accessory.type == "airquality") {
+                if (accessory.type == "humidity" || accessory.type == "temperature" || accessory.type == "airquality" || accessory.type == "airquality2") {
                   var cachedValue = this.storage.getItemSync("http-webhook-" + accessoryId);
                   if (cachedValue === undefined) {
                     cachedValue = 0;
@@ -271,6 +271,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
   this.fakeGatoHistoryService = undefined;
   this.id = sensorConfig["id"];
   this.name = sensorConfig["name"];
+  this.displayName = sensorConfig["name"];
   this.type = sensorConfig["type"];
   this.storage = storage;
 
@@ -315,7 +316,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for humidity sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  humidity: newState });
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  humidity: parseFloat(newState) });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity).on('get', this.getState.bind(this));
   }
@@ -325,7 +326,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for temperature sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.CurrentTemperature).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
-      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  temp: newState });
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  temp: parseFloat(newState) });
     }).bind(this);
     this.service.getCharacteristic(Characteristic.CurrentTemperature).on('get', this.getState.bind(this));
   }
@@ -334,8 +335,37 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     this.changeHandler = (function(newState) {
       this.log("Change HomeKit value for air quality sensor to '%s'.", newState);
       this.service.getCharacteristic(Characteristic.AirQuality).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+      //this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
     }).bind(this);
     this.service.getCharacteristic(Characteristic.AirQuality).on('get', this.getState.bind(this));
+    //this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).on('get', this.getState.bind(this));
+  }
+  else if (this.type === "airquality2") {
+    this.service = new Service.AirQualitySensor(this.name);
+    this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this);
+    this.changeHandler = (function(newState) {
+      this.log("Change HomeKit value for air quality sensor PPM value to '%s'.", newState);
+      quality = 0;
+
+      if(newState < 350){
+        quality = 1;
+      } else if(newState >= 350 && newState < 1000 ){
+        quality = 2;
+      } else if(newState >= 1000 && newState < 2000 ){
+        quality = 3;
+      } else if(newState >= 2000 && newState < 5000 ){
+        quality = 4;
+      } else if(newState >= 5000 ){
+        quality = 5;
+      }
+
+      this.log("Change HomeKit value for air quality sensor to '%s'.", quality);
+      this.service.getCharacteristic(Characteristic.AirQuality).updateValue(quality, undefined, CONTEXT_FROM_WEBHOOK);
+      this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).updateValue(parseInt(newState), undefined, CONTEXT_FROM_WEBHOOK);
+      this.fakeGatoHistoryService.addEntry({time: new Date().getTime() / 1000,  ppm: parseFloat(newState) });
+    }).bind(this);
+    this.service.getCharacteristic(Characteristic.AirQuality).on('get', this.getAQState.bind(this));
+    this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).on('get', this.getState.bind(this));
   }
 }
 
@@ -354,9 +384,37 @@ HttpWebHookSensorAccessory.prototype.getState = function(callback) {
   else if (this.type === "occupancy") {
     callback(null, state ? Characteristic.OccupancyDetected.OCCUPANCY_DETECTED : Characteristic.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   }
+  else if (this.type === "airquality2") {
+    callback(null, parseFloat(state));
+  }
   else {
     callback(null, state);
   }
+};
+
+HttpWebHookSensorAccessory.prototype.getAQState = function(callback) {
+  this.log("Getting current state for '%s'...", this.id);
+  var quality;
+
+  var state = this.storage.getItemSync("http-webhook-" + this.id);
+  if (state === undefined) {
+    quality = 0;
+  }
+  if (this.type === "airquality2") {
+      if(state < 350){
+        quality = 1;
+      } else if(state >= 350 && state < 1000 ){
+        quality = 2;
+      } else if(state >= 1000 && state < 2000 ){
+        quality = 3;
+      } else if(state >= 2000 && state < 5000 ){
+        quality = 4;
+      } else if(state >= 5000 ){
+        quality = 5;
+      }
+}
+    this.log("current state for '%s'...", quality);
+    callback(null, quality);
 };
 
 HttpWebHookSensorAccessory.prototype.getServices = function() {
@@ -367,7 +425,7 @@ HttpWebHookSensorAccessory.prototype.getServices = function() {
       .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Sensor")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Sensor" + this.id);
-      
+
   serviceList = [ infoService, this.service ];
 
   if (this.fakeGatoHistoryService) {
@@ -438,7 +496,7 @@ HttpWebHookSwitchAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Switch")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Switch")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Switch" + this.id);
       
@@ -516,7 +574,7 @@ HttpWebHookPushButtonAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Button")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Button")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Button" + this.id);
       
@@ -629,7 +687,7 @@ HttpWebHookLightAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Light")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Light")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Light" + this.id);
       
@@ -779,7 +837,7 @@ HttpWebHookThermostatAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Thermostat")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Thermostat")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Thermostat" + this.id);
       
@@ -868,7 +926,7 @@ HttpWebHookOutletAccessory.prototype.getServices = function() {
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
-      .setCharacteristic(Characteristic.Model, "Http Webhook "+ this.type + " Outlet")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Outlet")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Outlet" + this.id);
       
