@@ -6,6 +6,9 @@ var DEFAULT_REQUEST_TIMEOUT = 10000;
 var CONTEXT_FROM_WEBHOOK = "fromHTTPWebhooks";
 var CONTEXT_FROM_TIMEOUTCALL = "fromTimeoutCall";
 const version = require('./package.json').version;
+var CustomCharacteristic = {};
+var inherits = require('util').inherits;
+
 
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
@@ -341,6 +344,25 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     //this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).on('get', this.getState.bind(this));
   }
   else if (this.type === "airquality2") {
+
+  	//Start fakegato-history custom charactaristic (Air Quality PPM charactaristic)
+	CustomCharacteristic.AirQualCO2 = function() {
+		Characteristic.call(this, 'Air Quality CO2', 'E863F10B-079E-48FF-8F27-9C2605A29F52');
+		this.setProps({
+			format: Characteristic.Formats.UINT16,
+			unit: "ppm",
+			maxValue: 99999,
+			minValue: 0,
+			minStep: 1,
+			perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
+		});
+		this.value = this.getDefaultValue();
+	};
+	inherits(CustomCharacteristic.AirQualCO2, Characteristic);
+
+			
+			//end fakegato-history charactaristic
+
     this.service = new Service.AirQualitySensor(this.name);
     this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this);
     this.changeHandler = (function(newState) {
@@ -366,6 +388,7 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
     }).bind(this);
     this.service.getCharacteristic(Characteristic.AirQuality).on('get', this.getAQState.bind(this));
     this.service.getCharacteristic(Characteristic.CarbonDioxideLevel).on('get', this.getState.bind(this));
+    this.service.getCharacteristic(CustomCharacteristic.AirQualCO2).on('get', this.getState.bind(this));
   }
 }
 
@@ -875,11 +898,48 @@ function HttpWebHookOutletAccessory(log, outletConfig, storage) {
 
 HttpWebHookOutletAccessory.prototype.getState = function(callback) {
   this.log("Getting current state for '%s'...", this.id);
-  var state = this.storage.getItemSync("http-webhook-" + this.id);
-  if (state === undefined) {
-    state = false;
-  }
-  callback(null, state);
+  var state = undefined;
+  var urlToCall = this.stateURL;
+  var urlMethod = this.stateMethod;
+  var that = this;
+
+  if (urlToCall !== "" ) {
+    request({
+      method : urlMethod,
+      url : urlToCall,
+      timeout : DEFAULT_REQUEST_TIMEOUT
+    }, (function(err, response, body) {
+      var statusCode = response && response.statusCode ? response.statusCode : -1;
+      that.log("Request to '%s' finished with status code '%s' and body '%s'.", urlToCall, statusCode, body, err);
+      if (!err && statusCode == 200) {
+        var sonoff_reply = JSON.parse(body);
+        var responseState = sonoff_reply["POWER"];
+        that.log("Status is '%s' ", responseState);
+        if(responseState === "ON"){
+          state = true;
+          that.log("State is '%s' ", state);
+          callback(null, state);
+        } else if (responseState === "OFF"){
+          state = false;
+          that.log("State is '%s' ", state);
+          callback(null, state);
+        }
+      }
+      else {
+        that.log(err || new Error("Request to '" + urlToCall + "' was not succesful."));
+      }
+    }));
+  } else {
+    state = this.storage.getItemSync("http-webhook-" + this.id);
+
+    if (state === undefined) {
+      state = false;
+    }
+    callback(null, state);
+  } 
+
+  //this.log("State is '%s' ", state);
+  //callback(null, state);
 };
 
 HttpWebHookOutletAccessory.prototype.getStateInUse = function(callback) {
