@@ -649,17 +649,24 @@ HttpWebHookLightAccessory.prototype.getState = function(callback) {
         var responseState = sonoff_reply["POWER"];
         that.log("Status is '%s' ", responseState);
         if(responseState === "ON"){
-          that.log("State is '%s' ", state);
           state = true;
+          that.log("State is '%s' ", state);
           callback(null, state);
         } else if (responseState === "OFF"){
-          that.log("State is '%s' ", state);
           state = false;
+          that.log("State is '%s' ", state);
           callback(null, state);
         }
       }
       else {
         that.log(err || new Error("Request to '" + urlToCall + "' was not succesful."));
+        state = that.storage.getItemSync("http-webhook-" + that.id);
+
+        if (state === undefined) {
+	       state = false;
+        }
+        callback(null, state);
+
       }
     }));
   } else {
@@ -881,6 +888,8 @@ function HttpWebHookOutletAccessory(log, outletConfig, storage) {
   this.onMethod = outletConfig["on_method"] || "GET";
   this.offURL = outletConfig["off_url"] || "";
   this.offMethod = outletConfig["off_method"] || "GET";
+  this.stateURL = outletConfig["state_url"] || "";
+  this.stateMethod = outletConfig["state_method"] || "GET";
   this.storage = storage;
 
   this.service = new Service.Outlet(this.name);
@@ -927,6 +936,12 @@ HttpWebHookOutletAccessory.prototype.getState = function(callback) {
       }
       else {
         that.log(err || new Error("Request to '" + urlToCall + "' was not succesful."));
+        state = that.storage.getItemSync("http-webhook-" + that.id);
+
+        if (state === undefined) {
+          state = false;
+        }
+        callback(null, state);        
       }
     }));
   } else {
