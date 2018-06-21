@@ -22,6 +22,7 @@ module.exports = function(homebridge) {
   homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookLight", HttpWebHookLightAccessory);
   homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookThermostat", HttpWebHookThermostatAccessory);
   homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookOutlet", HttpWebHookOutletAccessory);
+  homebridge.registerAccessory("homebridge-http-webhooks", "HttpWebHookDoorbell", HttpWebHookDoorbellAccessory);
 };
 
 function HttpWebHooksPlatform(log, config) {
@@ -34,6 +35,7 @@ function HttpWebHooksPlatform(log, config) {
   this.lights = config["lights"] || [];
   this.thermostats = config["thermostats"] || [];
   this.outlets = config["outlets"] || [];
+  this.doorbells = config["doorbells"] || [];
   this.storage = require('node-persist');
   this.storage.initSync({
     dir : this.cacheDirectory
@@ -72,6 +74,11 @@ HttpWebHooksPlatform.prototype = {
     for (var i = 0; i < this.outlets.length; i++) {
       var outletAccessory = new HttpWebHookOutletAccessory(this.log, this.outlets[i], this.storage);
       accessories.push(outletAccessory);
+    }
+
+    for (var i = 0; i < this.doorbells.length; i++) {
+      var doorbellAccessory = new HttpWebHookDoorbellAccessory(this.log, this.doorbells[i], this.storage);
+      accessories.push(doorbellAccessory);
     }
 
     var accessoriesCount = accessories.length;
@@ -220,6 +227,21 @@ HttpWebHooksPlatform.prototype = {
                   }
                 }
                 else if (accessory.type == "pushbutton") {
+                  if (!theUrlParams.state) {
+                    responseBody = {
+                      success : true,
+                      state : cachedState
+                    };
+                  }
+                  else {
+                    var state = theUrlParams.state;
+                    var stateBool = state === "true";
+                    // this.log("[INFO Http WebHook Server] State change of '%s'
+                    // to '%s'.",accessory.id,stateBool);
+                    accessory.changeHandler(stateBool);
+                  }
+                }
+                else if (accessory.type == "doorbells") {
                   if (!theUrlParams.state) {
                     responseBody = {
                       success : true,
@@ -593,7 +615,7 @@ HttpWebHookPushButtonAccessory.prototype.setState = function(powerOn, callback, 
 };
 
 HttpWebHookPushButtonAccessory.prototype.getServices = function() {
-    var serviceList = [];
+  var serviceList = [];
   var infoService = new Service.AccessoryInformation();
   infoService.setCharacteristic(Characteristic.Name, this.name)
       .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
@@ -1004,6 +1026,62 @@ HttpWebHookOutletAccessory.prototype.getServices = function() {
       .setCharacteristic(Characteristic.Model, "Http Webhook Outlet")
       .setCharacteristic(Characteristic.FirmwareRevision, version)
       .setCharacteristic(Characteristic.SerialNumber, "Outlet" + this.id);
+      
+  serviceList = [ infoService, this.service ];
+
+  if (this.fakeGatoHistoryService) {
+    serviceList[serviceList.length] = this.fakeGatoHistoryService;
+  }
+  return serviceList;
+};
+
+
+function HttpWebHookDoorbellAccessory(log, doorbellConfig, storage) {
+  this.log = log;
+  this.id = doorbellConfig["id"];
+  this.type = "doorbell";
+  this.name = doorbellConfig["name"];
+
+  this.service = new Service.Doorbell(this.name);
+  this.changeHandler = (function(newState) {
+    if (newState) {
+      this.log("Change HomeKit state for doorbell to '%s'.", newState);
+      this.service.getCharacteristic(Characteristic.ProgrammableSwitchEvent).updateValue(newState, undefined, CONTEXT_FROM_WEBHOOK);
+/*      setTimeout(function() {
+        this.service.getCharacteristic(Characteristic.ProgrammableSwitchEvent).updateValue(false, undefined, CONTEXT_FROM_TIMEOUTCALL);
+      }.bind(this), 1000);*/
+    }
+  }).bind(this);
+  this.service.getCharacteristic(Characteristic.ProgrammableSwitchEvent).on('get', this.getState.bind(this)).on('set', this.setState.bind(this));
+}
+
+HttpWebHookDoorbellAccessory.prototype.getState = function(callback) {
+  this.log("Getting current state for '%s'...", this.id);
+  var state = false;
+  callback(null, state);
+};
+
+HttpWebHookDoorbellAccessory.prototype.setState = function(powerOn, callback, context) {
+  this.log("Doorbell state change for '%s'...", this.id);
+  if (!powerOn) {
+    callback(null);
+  }
+  else {
+    callback(null);
+    /*setTimeout(function() {
+      this.service.getCharacteristic(Characteristic.ProgrammableSwitchEvent).updateValue(false, undefined, CONTEXT_FROM_TIMEOUTCALL);
+    }.bind(this), 1000);*/
+  }
+};
+
+HttpWebHookDoorbellAccessory.prototype.getServices = function() {
+  var serviceList = [];
+  var infoService = new Service.AccessoryInformation();
+  infoService.setCharacteristic(Characteristic.Name, this.name)
+      .setCharacteristic(Characteristic.Manufacturer, "Http Webhook Platform")
+      .setCharacteristic(Characteristic.Model, "Http Webhook Doorbell")
+      .setCharacteristic(Characteristic.FirmwareRevision, version)
+      .setCharacteristic(Characteristic.SerialNumber, "Doorbell" + this.id);
       
   serviceList = [ infoService, this.service ];
 
