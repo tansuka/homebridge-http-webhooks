@@ -241,19 +241,23 @@ HttpWebHooksPlatform.prototype = {
                     accessory.changeHandler(stateBool);
                   }
                 }
-                else if (accessory.type == "doorbells") {
-                  if (!theUrlParams.state) {
+                else if (accessory.type == "doorbell") {
+                  var cachedValue = this.storage.getItemSync("http-webhook-" + accessoryId);
+                  if (cachedValue === undefined) {
+                    cachedValue = 0;
+                  }
+                  if (!theUrlParams.value) {
                     responseBody = {
                       success : true,
-                      state : cachedState
+                      state : cachedValue
                     };
                   }
                   else {
-                    var state = theUrlParams.state;
-                    var stateBool = state === "true";
-                    // this.log("[INFO Http WebHook Server] State change of '%s'
-                    // to '%s'.",accessory.id,stateBool);
-                    accessory.changeHandler(stateBool);
+                    var value = theUrlParams.value;
+                    this.storage.setItemSync("http-webhook-" + accessoryId, value);
+                    if (cachedValue !== value) {
+                      accessory.changeHandler(value);
+                    }
                   }
                 }
                 else {
@@ -367,23 +371,23 @@ function HttpWebHookSensorAccessory(log, sensorConfig, storage) {
   }
   else if (this.type === "airquality2") {
 
-  	//Start fakegato-history custom charactaristic (Air Quality PPM charactaristic)
-	CustomCharacteristic.AirQualCO2 = function() {
-		Characteristic.call(this, 'Air Quality CO2', 'E863F10B-079E-48FF-8F27-9C2605A29F52');
-		this.setProps({
-			format: Characteristic.Formats.UINT16,
-			unit: "ppm",
-			maxValue: 99999,
-			minValue: 0,
-			minStep: 1,
-			perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
-		});
-		this.value = this.getDefaultValue();
-	};
-	inherits(CustomCharacteristic.AirQualCO2, Characteristic);
+    //Start fakegato-history custom charactaristic (Air Quality PPM charactaristic)
+  CustomCharacteristic.AirQualCO2 = function() {
+    Characteristic.call(this, 'Air Quality CO2', 'E863F10B-079E-48FF-8F27-9C2605A29F52');
+    this.setProps({
+      format: Characteristic.Formats.UINT16,
+      unit: "ppm",
+      maxValue: 99999,
+      minValue: 0,
+      minStep: 1,
+      perms: [Characteristic.Perms.READ, Characteristic.Perms.NOTIFY]
+    });
+    this.value = this.getDefaultValue();
+  };
+  inherits(CustomCharacteristic.AirQualCO2, Characteristic);
 
-			
-			//end fakegato-history charactaristic
+      
+      //end fakegato-history charactaristic
 
     this.service = new Service.AirQualitySensor(this.name);
     this.fakeGatoHistoryService = new FakeGatoHistoryService("room", this);
@@ -685,14 +689,14 @@ HttpWebHookLightAccessory.prototype.getState = function(callback) {
         state = that.storage.getItemSync("http-webhook-" + that.id);
 
         if (state === undefined) {
-	       state = false;
+         state = false;
         }
         callback(null, state);
 
       }
     }));
   } else {
-  	state = this.storage.getItemSync("http-webhook-" + this.id);
+    state = this.storage.getItemSync("http-webhook-" + this.id);
 
     if (state === undefined) {
       state = false;
@@ -1043,6 +1047,8 @@ function HttpWebHookDoorbellAccessory(log, doorbellConfig, storage) {
   this.name = doorbellConfig["name"];
 
   this.service = new Service.Doorbell(this.name);
+  this.log("Service '%s'.", this.service);
+
   this.changeHandler = (function(newState) {
     if (newState) {
       this.log("Change HomeKit state for doorbell to '%s'.", newState);
